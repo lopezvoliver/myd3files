@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+
+text {
+  font: 16px monospace;
+}
+
+.enter {
+  fill: black;
+}
+
+.update {
+  fill: black;
+}
+
+.exit {
+  fill: brown;
+}
+
+</style>
+<svg width="860" height="250"></svg>
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script>
+
+	//Modification of dataBarwithKey: 
+
+	// - Read large 1-D data set instead of local one
+	// - Keys slide the data in X axis, showing a fixed N amount of data each time 
+	//	- At the end of the data, if there is "extra" data after the batch,
+	//	  the batch size is increased only for this last view
+	//	  Upon returning to the "left", the original batch size is re-established
+	// - Fixed range for Xscale
+	// - Increased width of figure and decreased width of bars to allow for more data
+
+	// External data: data1D.tsv
+
+var paddingLeft = 40, paddingRight=80;
+var paddingBottom = 50;
+var barWidth = 10;
+
+var svg = d3.select("svg"),
+    width = +svg.attr("width"),
+    height = +svg.attr("height");
+
+    svg.attr("transform","translate(0,20)");
+    g = svg.append("g").attr("transform", "translate("+paddingLeft+","+(height - paddingBottom)+")");
+    
+    
+var xScale = d3.scaleLinear()
+   .range([0, width - paddingRight]);
+   
+var yScale = d3.scaleLinear()
+.range([0,height-paddingBottom])
+.domain([0,0.3]);
+
+var yScale2 = d3.scaleLinear()
+.range([height-paddingBottom,0])
+.domain([0,0.3]);
+
+// Add Y axis:
+yAxis = svg.append("g")
+	.attr("transform", "translate("+paddingLeft+",0)")
+	.call(d3.axisLeft(yScale2));
+
+var dataset = [];
+var dataToSend = {};
+var dataSel1 = 0;
+var batchsize = 60;
+var origBatchSize = batchsize;
+var dataSel2 = dataSel1 + batchsize - 1;
+	//Read data here:
+	d3.text("data1D.tsv",function(text){
+		data = d3.tsvParseRows(text);	
+		dataset = data[0]; // (data1D.tsv is one row only)
+
+		dataToSend.Y = dataset.slice(dataSel1, dataSel2+1)
+		dataToSend.X = [dataSel1, dataSel2];
+		update(dataToSend);
+
+//		update(dataset.slice(dataSel1,dataSel2+1))
+	})
+
+	// The initial display.
+//	update(dataset[dataSel]);
+
+
+	window.onload = function(){
+		document.addEventListener("keydown",keyPush);
+	} // Code to listen to keystrokes
+
+	function keyPush(evt){
+
+		switch(evt.keyCode){
+			case 37: // Left
+			case 40: //Down
+			previous1 = dataSel1;
+			previous2 = dataSel2;
+
+			dataSel1 = dataSel1 - origBatchSize;
+			dataSel2 = dataSel2 - batchsize;
+			if(dataSel1<0) 
+			{
+				dataSel1 = previous1;
+				dataSel2 = previous2;
+			}
+			if(previous2==364) batchsize = origBatchSize;
+			//console.log(dataSel1);
+			dataToSend.Y = dataset.slice(dataSel1, dataSel2+1)
+			dataToSend.X = [dataSel1, dataSel2];
+			update(dataToSend);
+			 break;
+			case 39: //Right
+			case 38: // Up 
+			previous1 = dataSel1;
+			previous2 = dataSel2;
+
+			dataSel1 = dataSel1 + batchsize;
+			dataSel2 = dataSel2 + batchsize;
+
+			if(dataSel2>364) 
+			{
+				dataSel1 = previous1;
+				dataSel2 = 364;
+				batchsize = dataSel2 - dataSel1 + 1;
+			}
+			//console.log(dataSel1);
+			 dataToSend.Y = dataset.slice(dataSel1, dataSel2+1)
+			 dataToSend.X = [dataSel1, dataSel2];
+			 update(dataToSend);
+			break;
+			} // End switch
+	} // End function key press
+	
+	
+function update(DataToReceive) {
+	//console.log(batchsize)
+data = DataToReceive.Y;
+datarange = DataToReceive.X;
+
+datarange[0] = datarange[0] - 1;
+if(datarange[0]<0) datarange[0] = 0;
+datarange[1] = datarange[1] + 1;
+
+//console.log(datarange)
+//Set domain for x scale:
+xScale.domain(datarange);
+
+
+  // JOIN new data with old elements.
+  var rect = g.selectAll("rect")
+    .data(data, function(d) { return d; });
+  // EXIT old elements not present in new data.
+  rect.exit()
+      .attr("class", "exit")
+      .remove(); 	  
+
+  // UPDATE old elements present in new data.
+  rect.attr("class", "update")
+      .style("opacity", 1)
+      .attr("heigth", function(d) { return yScale(+d); }) 
+      .attr("x", function(d,i) {return xScale(i+1+datarange[0]) - barWidth/2;}) 
+
+
+  // ENTER new elements present in new data.
+  rect.enter().append("rect")
+      .attr("class", "enter")
+      .attr("y", function(d) {return -yScale(+d);})  
+      .attr("x", function(d,i) {return xScale(i+1+datarange[0]) - barWidth/2;}) // X is fixed based on position in array
+      .attr("width", barWidth) // Fixed width
+      .attr("height", function(d) {return yScale(+d);}) // Y: data-dependent height
+      .style("opacity", 1);
+
+//Remove old X axis:
+oldaxis = d3.select("#xaxis")
+	    .remove();
+
+// Add X axis:
+xAxis = svg.append("g")
+	.attr("id","xaxis")
+	.attr("transform", "translate("+paddingLeft+","+(height - paddingBottom)+")")
+	.call(d3.axisBottom(xScale));
+
+}
+
+</script>
+

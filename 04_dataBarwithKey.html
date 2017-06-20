@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+
+text {
+  font: bold 16px monospace;
+}
+
+.enter {
+  fill: black;
+}
+
+.update {
+  fill: black;
+}
+
+.exit {
+  fill: brown;
+}
+
+</style>
+<svg width="500" height="500"></svg>
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script>
+
+	//Modification of numCirclewithKey: 
+
+	// - Select from pre-determined data from Memory, instead
+	// of randomized data.
+	// Key presses left and down move the selection of data to the next selection
+	// Key presses right and up move the selection of data to the previous selection
+	// - Changed circles for bars with height proportional to data
+	// - Bars grow downward
+	// - X depends on index  (1-based)
+	// - Y fixed
+	// - Removed transitions
+	// - Added x scale
+	// - Added y scale
+
+	dataset = [];
+	dataset[0] = [1,2,3,4,5,6,7,8]
+	dataset[1] = [2,1]
+	dataset[2] = [1,5]
+	dataset[3] = [1,6,2,3,8,5]
+	dataset[4] = [2,3,1,7,8,6,5,4]
+ 	//first selection:	
+	dataSel = 0;  
+
+	window.onload = function(){
+		document.addEventListener("keydown",keyPush);
+	} // Code to listen to keystrokes
+
+	function keyPush(evt){
+		//console.log(dataSel)
+		switch(evt.keyCode){
+			case 37: // Left
+			case 40: // Down
+		 	 if(dataSel>0) dataSel=dataSel - 1; 			 
+			 update(dataset[dataSel]);
+			 break;
+			case 39: // Right
+			case 38: // Up
+			 if(dataSel<4) dataSel=dataSel + 1;
+		   	 update(dataset[dataSel]);
+			 break;
+			}
+	}
+	
+	
+var paddingLeft = 40;
+var paddingTop = 40; 
+
+var svg = d3.select("svg"),
+    width = +svg.attr("width"),
+    height = +svg.attr("height"),
+    g = svg.append("g").attr("transform", "translate("+paddingLeft+","+paddingTop+")");
+    
+    
+var xScale = d3.scaleLinear()
+   .range([0, width])
+   .domain([0,10]);
+
+var yScale = d3.scaleLinear()
+.range([0,400])
+.domain([0,8]);
+
+// Add X axis:
+xAxis = svg.append("g")
+	.attr("transform", "translate("+paddingLeft+",0)")
+	.call(d3.axisBottom(xScale));
+// Add Y axis:
+yAxis = svg.append("g")
+	.attr("transform", "translate("+paddingLeft+","+paddingTop+")")
+	.call(d3.axisLeft(yScale));
+
+var barWidth = 20;
+
+function update(data) {
+	//console.log(data);
+//  var t = d3.transition()
+//      .duration(250);
+
+  // JOIN new data with old elements.
+  var rect = g.selectAll("rect")
+    .data(data, function(d) { return d; });
+  // EXIT old elements not present in new data.
+  rect.exit()
+      .attr("class", "exit")
+      .remove(); 	  
+
+  // UPDATE old elements present in new data.
+  rect.attr("class", "update")
+      .style("opacity", 1)
+      .attr("heigth", function(d) { return yScale(d); }) 
+      .attr("x", function(d,i) {return xScale(i+1) - barWidth/2;}) 
+
+
+  // ENTER new elements present in new data.
+  rect.enter().append("rect")
+      .attr("class", "enter")
+      .attr("y", 0)  
+      .attr("x", function(d,i) {return xScale(i+1) - barWidth/2;}) // X is fixed based on position in array
+      .attr("width", barWidth) // Fixed width
+      //.attr("height",1) // They rise from a small rectangle
+      //.style("opacity", 1e-6)
+    //.transition(t)
+      .attr("height", function(d) {return yScale(d);}) // Y: data-dependent height
+      .style("opacity", 1);
+}
+
+// The initial display.
+update(dataset[dataSel]);
+
+</script>
+

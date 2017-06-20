@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+
+text {
+  font: 16px monospace;
+}
+
+.enter {
+  fill: black;
+}
+
+.update {
+  fill: black;
+}
+
+.exit {
+  fill: brown;
+}
+
+</style>
+<svg width="860" height="250"></svg>
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script>
+
+	//Modification of dataBarSliderwithKey: 
+
+	// - Instead of 1-D data set, the data will be 2D
+	// - Up and down buttons will now switch between the second dimension
+	//   to allow visualizaton of multiple 1-D data sets
+  	// The data set is a matrix: each row is one 1-D data set 
+	// Added a text to the svg to show which row it is displaying
+
+	// External data: data2D.tsv
+
+var paddingLeft = 40, paddingRight=80;
+var paddingBottom = 50;
+var barWidth = 10;
+
+var svg = d3.select("svg"),
+    width = +svg.attr("width"),
+    height = +svg.attr("height");
+
+    svg.attr("transform","translate(0,20)");
+    g = svg.append("g").attr("transform", "translate("+paddingLeft+","+(height - paddingBottom)+")");
+    
+var textBox = svg.append('text')
+	.attr("y",0)
+	.attr("x",width/2)
+//	.text("Row = 1")
+ 
+var xScale = d3.scaleLinear()
+   .range([0, width - paddingRight]);
+   
+var yScale = d3.scaleLinear()
+.range([0,height-paddingBottom])
+.domain([0,0.3]);
+
+var yScale2 = d3.scaleLinear()
+.range([height-paddingBottom,0])
+.domain([0,0.3]);
+
+// Add Y axis:
+yAxis = svg.append("g")
+	.attr("transform", "translate("+paddingLeft+",0)")
+	.call(d3.axisLeft(yScale2));
+var datasetLarge = [];
+var dataToSend = {};
+var dataSel1 = 0;
+var batchsize = 60;
+var origBatchSize = batchsize;
+var dataSel2 = dataSel1 + batchsize - 1;
+var dataSel3 = 0; // Selection of second dimension (1 slice)
+
+var dimX, dimY;  // Maximum size in x and y
+	//Read data here:
+	d3.text("data2D.tsv",function(text){
+		datasetLarge = d3.tsvParseRows(text); //all data in memory
+		dimY = datasetLarge.length - 1;
+		dataset = datasetLarge[dataSel3]; // and we select the subdata locally
+		dimX = dataset.length;
+		dataToSend.Y = dataset.slice(dataSel1, dataSel2+1)
+		dataToSend.X = [dataSel1, dataSel2];
+		dataToSend.Z = dataSel3;
+		//Initial display:
+		update(dataToSend);
+
+	})
+
+	window.onload = function(){
+		document.addEventListener("keydown",keyPush);
+	} // Code to listen to keystrokes
+
+	function keyPush(evt){
+
+		switch(evt.keyCode){
+			case 37: // Left
+			dataset = datasetLarge[dataSel3];
+			dimX = dataset.length;
+
+			previous1 = dataSel1;
+			previous2 = dataSel2;
+
+			dataSel1 = dataSel1 - origBatchSize;
+			dataSel2 = dataSel2 - batchsize;
+			if(dataSel1<0) 
+			{
+				dataSel1 = previous1;
+				dataSel2 = previous2;
+			}
+			if(previous2==dimX) batchsize = origBatchSize;
+			
+			dataToSend.Y = dataset.slice(dataSel1, dataSel2+1)
+			dataToSend.X = [dataSel1, dataSel2];
+			dataToSend.Z = dataSel3;
+			update(dataToSend);
+			 break;
+			case 39: //Right
+			dataset = datasetLarge[dataSel3];
+			dimX = dataset.length;
+			previous1 = dataSel1;
+			previous2 = dataSel2;
+
+			dataSel1 = dataSel1 + batchsize;
+			dataSel2 = dataSel2 + batchsize;
+
+			if(dataSel2>dimX) 
+			{
+				dataSel1 = previous1;
+				dataSel2 = dimX;
+				batchsize = dataSel2 - dataSel1 + 1;
+			}
+			 
+			 dataToSend.Y = dataset.slice(dataSel1, dataSel2+1)
+			 dataToSend.X = [dataSel1, dataSel2];
+			 update(dataToSend);
+			break;
+			case 38: // Up (will decrease dataSel3, i.e. scroll up in matrix) 
+			previous3 = dataSel3;
+
+			dataSel3 = dataSel3 - 1;
+
+			if(dataSel3<0) 
+			{
+				dataSel3 = previous3;
+			}
+			 dataset = datasetLarge[dataSel3];
+			 dimX = dataset.length;
+			 dataToSend.Y = dataset.slice(dataSel1, dataSel2+1)
+			 dataToSend.X = [dataSel1, dataSel2];
+			 dataToSend.Z = dataSel3;
+			 update(dataToSend);
+			break;
+			case 40: // Down (will increment dataSel1, i.e. scroll down in matrix)
+  			previous3 = dataSel3;
+
+			dataSel3 = dataSel3 + 1;
+
+			if(dataSel3>dimY){
+				dataSel3 = previous3;
+			}
+			 dataset = datasetLarge[dataSel3];
+			 dataToSend.Y = dataset.slice(dataSel1, dataSel2+1)
+			 dataToSend.X = [dataSel1, dataSel2];
+			 dataToSend.Z = dataSel3;
+			 update(dataToSend);					 		
+			 break;
+
+			} // End switch
+	} // End function key press
+	
+	
+function update(DataToReceive) {
+data = DataToReceive.Y;
+datarange = DataToReceive.X;
+dataZ = DataToReceive.Z;
+
+datarange[0] = datarange[0] - 1;
+if(datarange[0]<0) datarange[0] = 0;
+datarange[1] = datarange[1] + 1;
+
+//console.log(datarange)
+//Set domain for x scale:
+xScale.domain(datarange);
+
+// update text for row
+textBox.text("Row = "+(dataZ+1))
+
+  // JOIN new data with old elements.
+  var rect = g.selectAll("rect")
+    .data(data, function(d) { return d; });
+  // EXIT old elements not present in new data.
+  rect.exit()
+      .attr("class", "exit")
+      .remove(); 	  
+
+  // UPDATE old elements present in new data.
+  rect.attr("class", "update")
+      .style("opacity", 1)
+      .attr("heigth", function(d) { return yScale(+d); }) 
+      .attr("x", function(d,i) {return xScale(i+1+datarange[0]) - barWidth/2;}) 
+
+
+  // ENTER new elements present in new data.
+  rect.enter().append("rect")
+      .attr("class", "enter")
+      .attr("y", function(d) {return -yScale(+d);})  
+      .attr("x", function(d,i) {return xScale(i+1+datarange[0]) - barWidth/2;}) // X is fixed based on position in array
+      .attr("width", barWidth) // Fixed width
+      .attr("height", function(d) {return yScale(+d);}) // Y: data-dependent height
+      .style("opacity", 1);
+
+//Remove old X axis:
+oldaxis = d3.select("#xaxis")
+	    .remove();
+
+// Add X axis:
+xAxis = svg.append("g")
+	.attr("id","xaxis")
+	.attr("transform", "translate("+paddingLeft+","+(height - paddingBottom)+")")
+	.call(d3.axisBottom(xScale));
+
+}
+
+</script>

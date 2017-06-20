@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+
+text {
+  font: bold 48px monospace;
+}
+
+.enter {
+  fill: green;
+}
+
+.update {
+  fill: #333;
+}
+
+.exit {
+  fill: brown;
+}
+
+</style>
+<svg width="700" height="500"></svg>
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script>
+
+	//Modification of "numwithKey"
+	// to draw a circle (fixed Y and r) in position X based on the data
+
+	window.onload = function(){
+		document.addEventListener("keydown",keyPush);
+	} // Code to listen to keystrokes
+
+	function keyPush(evt){
+
+		var newData = d3.shuffle(numbet)
+				.slice(0, Math.floor(Math.random() * 10))
+
+		switch(evt.keyCode){
+			case 37: 
+			case 38:
+			case 39:
+			case 40:
+			update(newData);
+			break;
+			}
+	}
+	
+	
+
+var numbet = [1,2,3,4,5,6,7,8,9];
+
+var svg = d3.select("svg"),
+    width = +svg.attr("width"),
+    height = +svg.attr("height"),
+    g = svg.append("g").attr("transform", "translate(32," + (height / 2) + ")");
+    
+    
+var xScale = d3.scaleLinear()
+   .range([0, width])
+   .domain([0,10]);
+
+var rScale = d3.scaleLinear()
+.range([3,30])
+.domain([1,9]);
+
+function update(data) {
+	//console.log(data);
+  var t = d3.transition()
+      .duration(750);
+
+  // JOIN new data with old elements.
+  var circ = g.selectAll("circle")
+    .data(data, function(d) { return d; });
+
+  // EXIT old elements not present in new data.
+  circ.exit()
+      .attr("class", "exit")
+    .transition(t)
+      .attr("cy", 60)  // they go to the bottom
+      .style("opacity", 1e-6)
+      .remove();
+
+  // UPDATE old elements present in new data.
+  circ.attr("class", "update")
+      .attr("cy", 0)	
+      .style("opacity", 1)
+      .transition(t)
+      .attr("cx", function(d) { return xScale(d); }); // new data in element
+
+  // ENTER new elements present in new data.
+  circ.enter().append("circle")
+      .attr("class", "enter")
+      .attr("cy", -60)  //They emerge from the top
+      .attr("cx", function(d) { return xScale(d); })
+      .attr("r",function(d) {return rScale(d);})
+      .style("opacity", 1e-6)
+    .transition(t)
+      .attr("cy", 0)
+      .style("opacity", 1);
+}
+
+// The initial display.
+update(numbet);
+
+</script>
+

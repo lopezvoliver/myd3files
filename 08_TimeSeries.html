@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+
+text {
+  font: 16px sans-serif;
+}
+
+.axis text {
+  font: 14px sans-serif;
+}
+</style>
+<svg width="800" height="250"></svg>
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script>
+
+	//Modification of dataBarSlider2: 
+
+	// - Instead of Bars, the plot is now a line
+	// - X value is now loadd through an external data set
+	// 	which is in date format (DD-Mmm-YYYY)
+	// - Dimensions of svg modified to satisfy the Margin convention
+	// https://bl.ocks.org/mbostock/3019563
+	// - Incremented size of batch to a whole year
+	// - Changed font to sans-serif, added a class of text "axis" 
+
+	// External data: data2D.tsv  and dates.tsv
+
+	// Resources:
+	// Mike Bostocks block "Line Chart"
+	// https://bl.ocks.org/mbostock/3883245
+
+var barWidth = 10;
+
+var svg = d3.select("svg"),
+    margin = {top: 20, right: 0, bottom: 30, left: 50},
+    width = +svg.attr("width") - margin.left - margin.right,
+    height = +svg.attr("height") - margin.top - margin.bottom,
+    g = svg.append("g").attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+var textBox = g.append('text')
+	.attr("y",0)
+	.attr("x",width/2)
+	.attr("text-anchor","middle");
+ 
+var xScale = d3.scaleLinear()
+   .range([0, width]);
+   
+var yScale = d3.scaleLinear()
+.range([0,height])
+.domain([0,0.3]);
+
+var yScale2 = d3.scaleLinear()
+.range([height,0])
+.domain([0,0.3]);
+
+// Add Y axis:
+yAxis = g.append("g")
+	.attr("class","axis")
+	.call(d3.axisLeft(yScale2));
+
+var tScale = d3.scaleTime()
+	.rangeRound([0,width]);
+// Add function for line:
+var line = d3.line()
+	.x(function(d) {return tScale(d.x);})
+	.y(function(d) {return yScale2(d.y);})
+
+
+var datasetLarge = [];
+var dataToSend = {};
+var dates = [];
+var dataSel1 = 0;
+var batchsize = 365;
+var origBatchSize = batchsize;
+var dataSel2 = dataSel1 + batchsize - 1;
+var dataSel3 = 0; // Selection of second dimension (1 slice)
+var dimX, dimY;  // Maximum size in x and y
+
+var parseTime = d3.timeParse("%d-%b-%Y"); 
+
+
+	//Read data here:
+	d3.text("data2D.tsv",function(text){
+		datasetLarge = d3.tsvParseRows(text); //all data in memory
+		dimY = datasetLarge.length - 1;
+		dataset = datasetLarge[dataSel3]; // and we select the subdata locally
+		dimX = dataset.length;
+		dataToSend.Y = dataset.slice(dataSel1, dataSel2+1)
+		dataToSend.X = [dataSel1, dataSel2];
+		dataToSend.Z = dataSel3;
+
+		//Load dates.tsv:
+		// Here I am using d3.text, d3.tsvParseRows and a for loop instead of just using d3.tsv
+		// because I don't want the data to contain the header
+		// and so far as I understand, d3.tsv does not work when there is no header
+		d3.text("dates.tsv", function(text){
+		 	datestext = d3.tsvParseRows(text);
+			dimX2 = datestext.length; 
+			if(dimX2 != dimX) alert('Error: dim of dates does not match dim of data set');
+
+			for(i=0;i<dimX2;i++){
+				dates[i] = parseTime(datestext[i][0]);
+			}
+			// dates is now a global variable.. 
+
+			//Initial display:
+			update(dataToSend);
+
+		});
+
+		
+	})
+
+	window.onload = function(){
+		document.addEventListener("keydown",keyPush);
+	} // Code to listen to keystrokes
+
+	function keyPush(evt){
+
+		switch(evt.keyCode){
+			case 37: // Left
+			dataset = datasetLarge[dataSel3];
+			dimX = dataset.length;
+
+			previous1 = dataSel1;
+			previous2 = dataSel2;
+
+			dataSel1 = dataSel1 - origBatchSize;
+			dataSel2 = dataSel2 - batchsize;
+			if(dataSel1<0) 
+			{
+				dataSel1 = previous1;
+				dataSel2 = previous2;
+			}
+			if(previous2==dimX) batchsize = origBatchSize;
+			
+			dataToSend.Y = dataset.slice(dataSel1, dataSel2+1)
+			dataToSend.X = [dataSel1, dataSel2];
+			dataToSend.Z = dataSel3;
+			update(dataToSend);
+			 break;
+			case 39: //Right
+			dataset = datasetLarge[dataSel3];
+			dimX = dataset.length;
+			previous1 = dataSel1;
+			previous2 = dataSel2;
+
+			dataSel1 = dataSel1 + batchsize;
+			dataSel2 = dataSel2 + batchsize;
+
+			if(dataSel2>dimX) 
+			{
+				dataSel1 = previous1;
+				dataSel2 = dimX;
+				batchsize = dataSel2 - dataSel1 + 1;
+			}
+			 
+			 dataToSend.Y = dataset.slice(dataSel1, dataSel2+1)
+			 dataToSend.X = [dataSel1, dataSel2];
+			 update(dataToSend);
+			break;
+			case 38: // Up (will decrease dataSel3, i.e. scroll up in matrix) 
+			previous3 = dataSel3;
+
+			dataSel3 = dataSel3 - 1;
+
+			if(dataSel3<0) 
+			{
+				dataSel3 = previous3;
+			}
+			 dataset = datasetLarge[dataSel3];
+			 dimX = dataset.length;
+			 dataToSend.Y = dataset.slice(dataSel1, dataSel2+1)
+			 dataToSend.X = [dataSel1, dataSel2];
+			 dataToSend.Z = dataSel3;
+			 update(dataToSend);
+			break;
+			case 40: // Down (will increment dataSel1, i.e. scroll down in matrix)
+  			previous3 = dataSel3;
+
+			dataSel3 = dataSel3 + 1;
+
+			if(dataSel3>dimY){
+				dataSel3 = previous3;
+			}
+			 dataset = datasetLarge[dataSel3];
+			 dataToSend.Y = dataset.slice(dataSel1, dataSel2+1)
+			 dataToSend.X = [dataSel1, dataSel2];
+			 dataToSend.Z = dataSel3;
+			 update(dataToSend);					 		
+			 break;
+
+			} // End switch
+	} // End function key press
+	
+	
+function update(DataToReceive) {
+data = DataToReceive.Y;
+datarange = DataToReceive.X;
+dataZ = DataToReceive.Z;
+
+datarange[0] = datarange[0] - 1;
+if(datarange[0]<0) datarange[0] = 0;
+datarange[1] = datarange[1] + 1;
+
+//Set domain for x scale:
+xScale.domain(datarange);
+
+// Set domain for t scale:
+tScale.domain(d3.extent(dates.slice(datarange[0],datarange[1])))
+
+// update text for row
+textBox.text("Soil layer "+(dataZ+1))
+
+// prepare data to send to line function:
+var dataForLine = []; // Array of objects
+for(i=0;i<(datarange[1]-datarange[0]);i++){
+	temp = {};
+	temp.x = dates[datarange[0]+i]; //dates is a global var
+	temp.y = +data[i];
+	dataForLine[i] = temp;
+}
+
+
+// JOIN new data with old elements 
+var path = d3.selectAll("path")
+	.datum(dataForLine)
+
+// EXIT old elements not present in new data
+	path.exit()
+	.remove();
+
+// UPDATE old elements present in new data
+path.attr("d",line)
+      .attr("fill", "none")
+      .attr("stroke", "steelblue")
+      .attr("stroke-linejoin", "round")
+      .attr("stroke-linecap", "round")
+      .attr("stroke-width", 1.5)
+	    
+
+// ENTER new elements present in new data
+path.enter().append("path")
+      .attr("fill", "none")
+      .attr("stroke", "steelblue")
+      .attr("stroke-linejoin", "round")
+      .attr("stroke-linecap", "round")
+      .attr("stroke-width", 1.5)
+      .attr("d", line);
+
+//Remove old X axis:
+oldaxis = d3.select("#xaxis")
+	    .remove();
+
+// Add X axis:
+xAxis = g.append("g")
+	.attr("id","xaxis")
+	.attr("class","axis")
+	.attr("transform", "translate(0,"+height+")")
+//	.call(d3.axisBottom(tScale));
+	.call(d3.axisBottom(tScale).tickFormat(d3.timeFormat("%b")));
+
+}
+
+</script>
